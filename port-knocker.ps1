@@ -66,17 +66,11 @@ Function Enable-PortKnocking {
     Write-Banner
 
     $port = Read-Host -Prompt 'Enter port to knock (1 - 65535) '
-    $protocol = Read-Host -Prompt 'Enter protocol (tcp/udp) '
+    $knockPorts = Read-Host -Prompt 'Enter ports to listen for knock ' # check if knockPorts are running a service
     
-    $output = Get-PortStatus -Port $port -Protocol $protocol
+    $output = Get-PortStatus -Port $port
     if ($null -ne $output.ErrorMessage) {
-        if ($output.InvalidPort) {
-            Write-Warning $output.ErrorMessage
-        } elseif ($output.NoService) {
-            Write-Warning $output.ErrorMessage
-        } elseif ($output.InvalidProtocol) {
-            Write-Warning $output.ErrorMessage
-        }
+        Write-Warning $output.ErrorMessage
         Read-Host -Prompt 'Press any key to continue... '
         Write-Menu
         return
@@ -86,12 +80,13 @@ Function Enable-PortKnocking {
     $no = [System.Management.Automation.Host.ChoiceDescription]::new('&No', 'Stop process')
 
     $options = [System.Management.Automation.Host.ChoiceDescription[]]($yes, $no)
-    $result = $host.UI.PromptForChoice('', 'Are you sure want to knock daemon/port tcp?', $options, 0)
+    $result = $host.UI.PromptForChoice('', "Are you sure want to knock $($output.ServiceName) $Port/tcp?", $options, 0)
     
     switch ($result) {
         0 { 
 
-         }
+            Set-NetFirewallProfile -Enabled True -LogBlocked True
+        }
         1 { Write-Menu }
         Default { Write-Menu }
     }
@@ -103,9 +98,6 @@ Function Add-JsonCache {
         [string]$Service,
 
         [Parameter(Mandatory)]
-        [string]$Protocol,
-
-        [Parameter(Mandatory)]
         [int]$Port,
 
         [Parameter(Mandatory)]
@@ -113,9 +105,8 @@ Function Add-JsonCache {
     )
 
     $json = Get-Content '.\data.json' | ConvertFrom-Json
-    $data = "" | Select-Object Service, Protocol, Port, KnockPorts
+    $data = "" | Select-Object Service, Port, KnockPorts
     $data.Service = $Service
-    $data.Protocol = $Protocol
     $data.Port = $Port
     $data.KnockPorts = $KnockPorts
     $json.Daemon += $data
@@ -128,7 +119,23 @@ Function Disable-PortKnocking {
     Clear-Screen
     Write-Banner
 
+    $Port = Read-Host -Prompt 'Enter knocked port to disable '
+    $json = Get-Content '.\data.json'
+    foreach ($object in $json.Daemon) {
+        if ($object.Port -eq $Port) {
+            $index = [array]::IndexOf($json.Daemon, $object)
+            # remove object from json
+            $json | Set-Content '.\data.json'
+            Write-Menu
+            return
+        }
+    }
 
+    Write-Warning "$Port is not knocked"
+    Read-Host -Prompt 'Press any key to continue...'
+    Write-Menu
+
+    
 }
 
 Function Get-KnockedPorts {
@@ -137,7 +144,7 @@ Function Get-KnockedPorts {
     Write-Banner
 
     $json = Get-Content '.\data.json' | ConvertFrom-Json | Select-Object -Expand Daemon
-    $json | Select-Object Service, Protocol, Port, KnockPorts | Out-Host
+    $json | Select-Object Service, Port, KnockPorts | Out-Host
     
     Read-Host -Prompt 'Press any key to continue... '
     Write-Menu
@@ -145,39 +152,20 @@ Function Get-KnockedPorts {
 
 Function Get-PortStatus {
     param (
-        [Parameter(Mandatory)]
-        [int]$Port,
-
-        [Parameter(Mandatory)]
-        [string]$Protocol
+        [int]$Port
     )
 
-    $output = '' | Select-Object ServiceName, ErrorMessage, InvalidPort, InvalidProtocol, NoService
+    $output = '' | Select-Object ServiceName, ErrorMessage
     if (!($Port -ge 1 || $Port -le 65355)) {
         $output.ErrorMessage = 'Port cannot less than 1 and greater than 65535'
-        $output.InvalidPort = $true
         return $output
     }
 
-    if ($Protocol.ToLower() -eq 'tcp') {
-        Get-NetTCPConnection -LocalPort $Port -ErrorAction Ignore | Out-Null
-        if ($?) {
-            $output.ServiceName = Get-Process -Id (Get-NetTCPConnection -LocalPort $Port).OwningProcess | Select-Object ProcessName
-        } else {
-            $output.ErrorMessage = 'No service is running on ' + $Port + '/tcp'
-            $output.NoService = $true
-        }
-    } elseif ($Protocol.ToLower() -eq 'udp') {
-        Get-NetUDPEndpoint -LocalPort $Port -ErrorAction Ignore | Out-Null
-        if ($?) {
-            $output.ServiceName = Get-Process -Id (Get-NetUDPEndpoint -LocalPort $Port).OwningProcess | Select-Object ProcessName
-        } else {
-            $output.ErrorMessage = 'No service is running on ' + $Port + '/udp'
-            $output.NoService = $true
-        }
+    Get-NetTCPConnection -LocalPort $Port -ErrorAction Ignore | Out-Null
+    if ($?) {
+        $output.ServiceName = (Get-Process -Id (Get-NetTCPConnection -LocalPort $Port).OwningProcess).ProcessName
     } else {
-        $output.ErrorMessage = 'Invalid protocol specified'
-        $output.InvalidProtocol = $true
+        $output.ErrorMessage = "No service is running on $Port'/tcp"
     }
 
     return $output
