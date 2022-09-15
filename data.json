@@ -1,0 +1,16 @@
+{
+    "Daemon" : [
+        {
+            "Service" : "ssh",
+            "Protocol" : "tcp",
+            "Port" : 22,
+            "KnockPorts" : [ 400, 300, 500]
+        },
+        {
+            "Service" : "https",
+            "Protocol" : "tcp",
+            "Port" : 443,
+            "KnockPorts" : [ 450, 700, 600 ]
+        }
+    ]
+}
