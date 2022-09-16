@@ -3,12 +3,14 @@
         {
             "Service" : "ssh",
             "Port" : 22,
-            "KnockPorts" : [ 400, 300, 500]
+            "OpenSequence" : [ 450, 700, 600 ],
+            "CloseSequence" : [ 450, 700, 600 ]
         },
         {
             "Service" : "https",
             "Port" : 443,
-            "KnockPorts" : [ 450, 700, 600 ]
+            "OpenSequence" : [ 450, 700, 600 ],
+            "CloseSequence" : [ 450, 700, 600 ]
         }
     ]
 }
