@@ -43,8 +43,7 @@ Function Write-Menu {
     Write-Host "4: Knock a port"
     Write-Host "5: Disable knocking for a port"
     Write-Host "6: List knocked ports"
-    Write-Host "7: Exit"
-    Write-Host ""
+    Write-Host "7: Exit`n"
 
     $choice = Read-Host -Prompt '> '
 
@@ -59,12 +58,6 @@ Function Write-Menu {
         Default { Write-Menu }
     }
 }
-
-Function Get-FirewallState {
-    param()
-    # check if firewall is enabled and also logging
-}
-
 
 Function Enable-PortKnocking {
     param ()
@@ -91,9 +84,9 @@ Function Enable-PortKnocking {
             Write-Menu
             return
         }
-        Get-NetTCPConnection -LocalPort [uint16]$value -ErrorAction Ignore | Out-Null
+        Get-NetTCPConnection -LocalPort $value -ErrorAction Ignore | Out-Null
         if ($?) {
-            $service = (Get-Process -Id (Get-NetTCPConnection -LocalPort [uint16]$value).OwningProcess).ProcessName
+            $service = (Get-Process -Id (Get-NetTCPConnection -LocalPort $value).OwningProcess).ProcessName
             Write-Warning "Cannot use port $value in open sequence, $service is using it"
             Read-Host -Prompt 'Press any key to continue...'
             Write-Menu
@@ -108,9 +101,9 @@ Function Enable-PortKnocking {
             Write-Menu
             return
         }
-        Get-NetTCPConnection -LocalPort [int]$value -ErrorAction Ignore | Out-Null
+        Get-NetTCPConnection -LocalPort $value -ErrorAction Ignore | Out-Null
         if ($?) {
-            $service = (Get-Process -Id (Get-NetTCPConnection -LocalPort [int]$value).OwningProcess).ProcessName
+            $service = (Get-Process -Id (Get-NetTCPConnection -LocalPort $value).OwningProcess).ProcessName
             Write-Warning "Cannot use port $value in close sequence, $service is using it"
             Read-Host -Prompt 'Press any key to continue...'
             Write-Menu
@@ -121,12 +114,10 @@ Function Enable-PortKnocking {
     $yes  = [System.Management.Automation.Host.ChoiceDescription]::new('&Yes', 'Proceed to knock port')
     $no = [System.Management.Automation.Host.ChoiceDescription]::new('&No', 'Stop process')
 
-    Write-Host "Port: $port/tcp"
+    Write-Host "`nPort: $port/$protocol"
     Write-Host "Service: $($output.ServiceName)"
-    Write-Host "Protocol: $protocol"
     Write-Host "Open Sequence: $openSequence"
-    Write-Host "Close Sequence: $closeSequence"
-    Write-Host ""
+    Write-Host "Close Sequence: $closeSequence`n"
 
     $options = [System.Management.Automation.Host.ChoiceDescription[]]($yes, $no)
     $result = $host.UI.PromptForChoice('', "Are you sure want to knock $($output.ServiceName) $Port/tcp?", $options, 0)
@@ -136,7 +127,9 @@ Function Enable-PortKnocking {
             Write-Host ''
             Write-Host 'Writing to cache ...'
             Add-JsonCache -Service $output.ServiceName -Port $port -Protocol $protocol -OpenSequence $openSequence -CloseSequence $closeSequence
-            # Set-NetFirewallProfile -Enabled True -LogBlocked True
+            Write-Host "$port/$protocol knocked successfully`n"
+            Read-Host -Prompt 'Press any key to continue...'
+            Write-Menu
         }
         1 { Write-Menu }
         Default { Write-Menu }
@@ -166,11 +159,17 @@ Function Add-JsonCache {
     $data.Service = $Service
     $data.Port = $Port
     $data.Protocol = $Protocol
-    $data.OpenSequence = $OpenSequence
-    $data.CloseSequence = $CloseSequence
-    $json += $data
+    [array]$openSeq = foreach ($sequence in $OpenSequence) {
+        [int]::Parse($sequence)
+    }
+    $data.OpenSequence = $openSeq
+    [array]$closeSeq = foreach ($sequence in $CloseSequence) {
+        [int]::Parse($sequence)
+    }
+    $data.CloseSequence = $closeSeq
+    [array]$json.Daemon += $data
 
-    $json | Set-Content '.\data.json'
+    $json | ConvertTo-Json | Set-Content '.\data.json'
 }
 
 Function Disable-PortKnocking {
@@ -181,7 +180,7 @@ Function Disable-PortKnocking {
     $Port = Read-Host -Prompt 'Enter knocked port to disable '
     $Protocol = Read-Host -Prompt 'Enter protocol (tcp/udp) '
     $json = Get-Content '.\data.json' | ConvertFrom-Json
-    foreach ($object in $json) {
+    foreach ($object in $json.Daemon) {
         if ($object.Port -eq $Port -and $object.Protocol -eq $Protocol) {
             $yes  = [System.Management.Automation.Host.ChoiceDescription]::new('&Yes', "Disable knocking on port $($object.Port)/$($object.Protocol) $($object.Service)")
             $no = [System.Management.Automation.Host.ChoiceDescription]::new('&No', 'Cancel')
@@ -193,14 +192,8 @@ Function Disable-PortKnocking {
             switch ($result) {
                 0 { 
                     Write-Host 'Updating cache...'
-                    $json | Where-Object { $_.Service -ne $object.Service } | ConvertTo-Json | Set-Content '.\data.json'
-                    Write-Host 'Restarting knockd service...'
-                    Restart-Service Knockd -ErrorAction Ignore
-                    if($?) {
-                        Write-Host 'Knockd service has restarted'
-                    } else {
-                        Write-Warning 'Something went wrong. Knockd restart failed.'
-                    }
+                    [array]$json.Daemon = $json.Daemon | Where-Object { $_.Service -ne $object.Service }
+                    $json | ConvertTo-Json | Set-Content '.\data.json'
                     Write-Host "Knocking on port $($object.Port)/$($object.Protocol) has been disabled"
                     Read-Host -Prompt 'Press any key to continue...'
                     Write-Menu
@@ -225,7 +218,7 @@ Function Get-KnockedPorts {
     Write-Banner
 
     $json = Get-Content '.\data.json' | ConvertFrom-Json
-    $json | Select-Object Service, Port, Protocol, OpenSequence, CloseSequence | Format-Table | Out-Host
+    $json.Daemon | Select-Object Service, Port, Protocol, OpenSequence, CloseSequence | Format-Table | Out-Host
     
     Read-Host -Prompt 'Press any key to continue... '
     Write-Menu
@@ -248,14 +241,14 @@ Function Get-PortStatus {
         if ($?) {
             $output.ServiceName = (Get-Process -Id (Get-NetTCPConnection -LocalPort $Port).OwningProcess).ProcessName
         } else {
-            $output.ErrorMessage = "No service is running on $Port'/tcp"
+            $output.ErrorMessage = "No service is running on $Port/tcp"
         }
     } elseif ($Protocol.ToLower() -eq 'udp') {
         Get-NetUDPEndpoint -LocalPort $Port -ErrorAction Ignore | Out-Null
         if ($?) {
             $output.ServiceName = (Get-Process -Id (Get-NetUDPEndpoint -LocalPort $Port).OwningProcess).ProcessName
         } else {
-            $output.ErrorMessage = "No service is running on $Port'/udp"
+            $output.ErrorMessage = "No service is running on $Port/udp"
         }
     } else {
         $output.ErrorMessage = 'Invalid protocol'
@@ -275,22 +268,34 @@ Function Start-KnockdService {
         if ($service.Status -eq 'Stopped') {
             Write-Host 'Starting Knockd service...'
             Start-Service Knockd
+            if($?) {
+                Write-Host 'Knockd service started successfully'
+            } else {
+                Write-Warning 'Something went wrong. Knockd not started'
+            }
         } else {
             Write-Host 'Knockd is already running'
         }
     } else {
         $params = @{
             Name = 'Knockd'
-            BinaryPathName = ""
+            BinaryPathName = "$($PSScriptRoot)\knockd.ps1"
             DisplayName = 'Port Knocking Service'
             StartupType = 'Automatic'
             Description = 'Windows Port Knocking Service'
         }
         Write-Host 'Creating Knockd service'
         New-Service @params
-        Write-Host 'Starting Knockd service' # move knockd file to a location
+        Write-Host 'Starting Knockd service...'
         Start-Service Knockd
+        if($?) {
+            Write-Host 'Knockd service started successfully'
+        } else {
+            Write-Warning 'Something went wrong. Knockd not started'
+        }
     }
+    Read-Host -Prompt "`nPress any key to continue..."
+    Write-Menu
 }
 
 Function Stop-KnockdService {

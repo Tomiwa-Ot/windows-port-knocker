@@ -1,16 +1,18 @@
-[
+{
+  "Daemon": [
     {
-        "Service" : "ssh",
-        "Port" : 22,
-        "Protocol" : "tcp",
-        "OpenSequence" : [ 450, 700, 600 ],
-        "CloseSequence" : [ 450, 700, 600 ]
+      "Service": "ssh",
+      "Port": 22,
+      "Protocol": "tcp",
+      "OpenSequence": "450 700 600",
+      "CloseSequence": "450 700 600"
     },
     {
-        "Service" : "https",
-        "Port" : 443,
-        "Protocol" : "tcp",
-        "OpenSequence" : [ 450, 700, 600 ],
-        "CloseSequence" : [ 450, 700, 600 ]
+      "Service": "https",
+      "Port": 443,
+      "Protocol": "tcp",
+      "OpenSequence": "450 700 600",
+      "CloseSequence": "450 700 600"
     }
-]
+  ]
+}
