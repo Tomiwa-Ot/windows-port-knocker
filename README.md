@@ -1,2 +1,2 @@
 # Windows Port-Knocker
-Enable/Disable TCP ports based on sequences of SYN packets sent to defined ports.
+Enable/Disable ports based on sequences of SYN packets sent to defined ports.
