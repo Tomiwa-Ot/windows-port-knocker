@@ -1,18 +1,25 @@
 {
-  "Daemon": [
-    {
-      "Service": "ssh",
-      "Port": 22,
-      "Protocol": "tcp",
-      "OpenSequence": "450 700 600",
-      "CloseSequence": "450 700 600"
-    },
-    {
-      "Service": "https",
-      "Port": 443,
-      "Protocol": "tcp",
-      "OpenSequence": "450 700 600",
-      "CloseSequence": "450 700 600"
-    }
-  ]
+    "Daemon":  [
+                   {
+                       "Service":  "ssh",
+                       "Port":  22,
+                       "Protocol":  "tcp",
+                       "OpenSequence":  "450 700 600",
+                       "CloseSequence":  "450 700 600"
+                   },
+                   {
+                       "Service":  "https",
+                       "Port":  443,
+                       "Protocol":  "tcp",
+                       "OpenSequence":  "450 700 600",
+                       "CloseSequence":  "450 700 600"
+                   },
+                   {
+                       "Service":  "java",
+                       "Port":  8080,
+                       "Protocol":  "tcp",
+                       "OpenSequence":  "4654 543 34343",
+                       "CloseSequence":  "4345 6542 456"
+                   }
+               ]
 }

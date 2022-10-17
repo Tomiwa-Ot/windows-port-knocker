@@ -130,7 +130,7 @@ Function Enable-PortKnocking {
         0 { 
             Write-Host ''
             Write-Host 'Writing to cache ...'
-            Add-JsonCache -Service $output.ServiceName -Port $port -Protocol $protocol -OpenSequence $openSequence -CloseSequence $closeSequence
+            Add-JsonCache -Service "$($output.ServiceName)" -Port $port -Protocol $protocol -OpenSequence $openSequence -CloseSequence $closeSequence
             Write-Host "$port/$protocol knocked successfully`n"
             Read-Host -Prompt 'Press any key to continue...'
             Write-Menu
@@ -268,7 +268,7 @@ Function Start-KnockdService {
     Write-Host 'Enabling logging for blocked requests...'
     Set-NetFirewallProfile -Enabled True -LogBlocked True
     $service = Get-Service -ErrorAction Ignore | Where-Object -Property Name -eq Knockd
-    if ($?) {
+    if ($null -ne $service) {
         if ($service.Status -eq 'Stopped') {
             Write-Host 'Starting Knockd service...'
             Start-Service Knockd
